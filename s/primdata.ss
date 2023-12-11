@@ -1649,7 +1649,7 @@
   (record-type-equal-procedure [sig [(rtd) -> (maybe-procedure)] [(rtd maybe-procedure) -> (void)]] [flags])
   (record-type-hash-procedure [sig [(rtd) -> (maybe-procedure)] [(rtd maybe-procedure) -> (void)]] [flags])
   (record-type-has-named-fields? [sig [(rtd) -> (boolean)]] [flags])
-  (record-writer [sig [(rtd) -> (maybe-procedure)] [(rtd maybe-procedure) -> (void)]] [flags])
+  (record-writer [sig [(rtd) -> (maybe-procedure)] [(rtd maybe-procedure) -> (void)] [(rtd maybe-procedure ptr) -> (void)]] [flags])
   (reference-address->object [sig [(sub-uint) -> (ptr)]] [flags])
   (reference*-address->object [sig [(sub-uint) -> (ptr)]] [flags])
   (reference-bytevector? [sig [(ptr) -> (boolean)]] [flags pure mifoldable discard])

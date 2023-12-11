@@ -32,45 +32,73 @@
 
 (define record-writer
   (let ([rw-ht #f] [cache '()])
+    (define-record-type entry
+      (sealed #t) (opaque #t) (nongenerative #{g0 o1kayheluid3bsc08k76wa0ag-0})
+      (fields proc pw?))
+    (define entry=?
+      (lambda (e1 e2)
+        (and (eq? (entry-proc e1) (entry-proc e2)) (eq? (entry-pw? e1) (entry-pw? e2)))))
+    (define default-record-writer
+      (lambda (x p wr)
+        (let ([rtd ($record-type-descriptor x)])
+          (cond                      ; keep in sync with wrhelp
+           [(record-type-opaque? rtd)
+            (fprintf p "#<~a>" (csv7:record-type-name rtd))]
+           [(record-type-descriptor? x)
+            (fprintf p "#<record type ~:s>" (record-type-uid x))]
+           [(record-constructor-descriptor? x)
+            (fprintf p "#<record constructor descriptor>")]
+           [else
+            (display "#[" p)
+           ; we use write instead of wr here so that the field doesn't get
+           ; a reference (#n#) when print-graph is true.
+            (write (or (record-reader rtd) (record-type-uid rtd)) p)
+            (do ([flds (csv7:record-type-field-names rtd) (cdr flds)]
+                 [i 0 (+ i 1)])
+                ((null? flds))
+              (write-char #\space p)
+              (wr ((csv7:record-field-accessor rtd i) x) p))
+            (write-char #\] p)]))))
+    (define default-procedure-writer
+      (lambda (r p wr)
+        (wr (wrapper-procedure-procedure r) p)))
+    (define default-entry (make-entry default-record-writer #f))
+    (define ref-entry
+      (lambda (rtd)
+        (cond
+         [(not rw-ht) #f]
+         [(eq-hashtable-ref rw-ht rtd #f)]
+         [else
+          (let ([e (or (let f ([rtd rtd])
+                         (let ([rtd (record-type-parent rtd)])
+                           (and rtd
+                                (or (eq-hashtable-ref rw-ht rtd #f)
+                                    (f rtd)))))
+                       default-entry)])
+          ; cache the derived entry
+           (eq-hashtable-cell rw-ht rtd e)
+           (set! cache (weak-cons rtd cache))
+           e)])))
     (case-lambda
-      [(rtd)
-       (define default-record-writer
-         (lambda (x p wr)
-           (let ([rtd ($record-type-descriptor x)])
-             (cond ; keep in sync with wrhelp
-               [(record-type-opaque? rtd)
-                (fprintf p "#<~a>" (csv7:record-type-name rtd))]
-               [(record-type-descriptor? x)
-                (fprintf p "#<record type ~:s>" (record-type-uid x))]
-               [(record-constructor-descriptor? x)
-                (fprintf p "#<record constructor descriptor>")]
-               [else
-                (display "#[" p)
-               ; we use write instead of wr here so that the field doesn't get
-               ; a reference (#n#) when print-graph is true.
-                (write (or (record-reader rtd) (record-type-uid rtd)) p)
-                (do ([flds (csv7:record-type-field-names rtd) (cdr flds)]
-                     [i 0 (+ i 1)])
-                    ((null? flds))
-                  (write-char #\space p)
-                  (wr ((csv7:record-field-accessor rtd i) x) p))
-                (write-char #\] p)]))))
-       (unless (record-type-descriptor? rtd)
-         ($oops 'record-writer "~s is not a record-type descriptor" rtd))
-       (if rw-ht
-           (or (eq-hashtable-ref rw-ht rtd #f)
-               (let ([proc (or (let f ([rtd rtd])
-                                 (let ([rtd (record-type-parent rtd)])
-                                   (and rtd
-                                     (or (eq-hashtable-ref rw-ht rtd #f)
-                                         (f rtd)))))
-                               default-record-writer)])
-                ; cache the derived entry
-                 (eq-hashtable-cell rw-ht rtd proc)
-                 (set! cache (weak-cons rtd cache))
-                 proc))
-           default-record-writer)]
-      [(rtd proc)
+      [(obj)
+       (exclusive-cond
+         [(record-type-descriptor? obj)
+          (let ([e (ref-entry obj)])
+            (if e
+                (entry-proc e)
+                default-record-writer))]
+         [(wrapper-procedure? obj)
+          (let ([data (wrapper-procedure-data obj)])
+            (and ($record? data)
+                 (let* ([rtd ($record-type-descriptor data)]
+                        [e (ref-entry rtd)])
+                   (if (and e (entry-pw? e))
+                       (entry-proc e)
+                       default-procedure-writer))))]
+         [else
+          ($oops 'record-writer "~s is neither a record-type descriptor nor a wrapper procedure" obj)])]
+      [(rtd proc) (record-writer rtd proc #f)]
+      [(rtd proc pw?)
        (unless (record-type-descriptor? rtd)
          ($oops 'record-writer "~s is not a record-type descriptor" rtd))
        (unless (or (procedure? proc) (eq? proc #f))
@@ -78,69 +106,70 @@
        (unless rw-ht (set! rw-ht (make-weak-eq-hashtable)))
       ; remove derived entries for rtd and any of its children
        (set! cache
-         (let f ([cache cache])
-           (cond
-             [(null? cache) '()]
-             [(eq? (car cache) #!bwp) (f (cdr cache))]
-             [(let g ([x (car cache)])
-                (and x (or (eq? x rtd) (g (record-type-parent x)))))
-              (eq-hashtable-delete! rw-ht (car cache))
-              (f (cdr cache))]
-             [else (weak-cons (car cache) (f (cdr cache)))])))
-       (let ([a (eq-hashtable-cell rw-ht rtd proc)])
-         (unless (eq? (cdr a) proc) (set-cdr! a proc)))])))
+             (let f ([cache cache])
+               (cond
+                [(null? cache) '()]
+                [(eq? (car cache) #!bwp) (f (cdr cache))]
+                [(let g ([x (car cache)])
+                   (and x (or (eq? x rtd) (g (record-type-parent x)))))
+                 (eq-hashtable-delete! rw-ht (car cache))
+                 (f (cdr cache))]
+                [else (weak-cons (car cache) (f (cdr cache)))])))
+       (let* ([e (make-entry proc pw?)]
+              [a (eq-hashtable-cell rw-ht rtd e)])
+         (unless (entry=? (cdr a) e) (set-cdr! a e)))])))
 
 (let ()
-(define black-hole '#0=#0#)
+  (define black-hole '#0=#0#)
 
-(define hashable?
-  (lambda (x)
-    (if (fixmediate? x)
-        (eq? x black-hole)
-        (and
-          ($object-in-heap? x)
-          (or (pair? x)
-              (vector? x)
-              ($stencil-vector? x)
-              (box? x)
-              (and ($record? x) (not (eq? x #!base-rtd)))
-              (fxvector? x)
-              (flvector? x)
-              (string? x)
-              (bytevector? x)
-              (gensym? x))))))
+  (define hashable?
+    (lambda (x)
+      (if (fixmediate? x)
+          (eq? x black-hole)
+          (and
+           ($object-in-heap? x)
+           (or (pair? x)
+               (vector? x)
+               ($stencil-vector? x)
+               (box? x)
+               (and ($record? x) (not (eq? x #!base-rtd)))
+               (fxvector? x)
+               (flvector? x)
+               (string? x)
+               (bytevector? x)
+               (gensym? x))))))
 
-(define bit-sink
-  (let ([bsp #f])
-    (define make-bit-sink-port
+  (define bit-sink
+    (let ([bsp #f])
+      (define make-bit-sink-port
+        (lambda ()
+          (define handler
+            (message-lambda
+             (lambda (msg . args) ($oops 'bit-sink-port "operation ~s not handled" msg))
+             [(block-write p s n) (void)]
+             [(clear-output-port p) (set-textual-port-output-index! p 0)]
+             [(close-port p)
+              (set-textual-port-output-size! p 0)
+              (mark-port-closed! p)]
+             [(flush-output-port p) (set-textual-port-output-index! p 0)]
+             [(port-name p) "bit-sink port"]
+             [(write-char c p) (set-textual-port-output-index! p 0)]))
+          (make-output-port handler (make-string 1024))))
       (lambda ()
-        (define handler
-          (message-lambda
-            (lambda (msg . args) ($oops 'bit-sink-port "operation ~s not handled" msg))
-            [(block-write p s n) (void)]
-            [(clear-output-port p) (set-textual-port-output-index! p 0)]
-            [(close-port p)
-             (set-textual-port-output-size! p 0)
-             (mark-port-closed! p)]
-            [(flush-output-port p) (set-textual-port-output-index! p 0)]
-            [(port-name p) "bit-sink port"]
-            [(write-char c p) (set-textual-port-output-index! p 0)]))
-        (make-output-port handler (make-string 1024))))
-    (lambda ()
-      (or bsp (let ([p (make-bit-sink-port)]) (set! bsp p) p)))))
+        (or bsp (let ([p (make-bit-sink-port)]) (set! bsp p) p)))))
 
-(define (graph-env x lev len)
-   ;; NOTE: if used as is in fasl.ss, fasl.ss will have to play
-   ;; $last-new-vector-element game.
-   ;; $make-graph-env takes an object, a print level, and a print
-   ;; length, and returns a procedure whose first argument is a
-   ;; message, one of 'tag, 'tag?, or 'count.  If the message is
-   ;; 'tag, one of #f, (mark . <n>), or (ref . <n>) is returned if
-   ;; the second argument needs no tag, a mark tag, or a reference
-   ;; tag.  If the message is 'tag?, #f is returned iff the second
-   ;; argument needs no tag.  If the message is 'count, the number
-   ;; of items needing tags is returned.
-   (let ([ht (make-eq-hashtable)] [count 0])
+  (define (graph-env x lev len)
+    ;; NOTE: if used as is in fasl.ss, fasl.ss will have to play
+    ;; $last-new-vector-element game.
+    ;; $make-graph-env takes an object, a print level, and a print
+    ;; length, and returns a procedure whose first argument is a
+    ;; message, one of 'tag, 'tag?, or 'count.  If the message is
+    ;; 'tag, one of #f, (mark . <n>), or (ref . <n>) is returned if
+    ;; the second argument needs no tag, a mark tag, or a reference
+    ;; tag.  If the message is 'tag?, #f is returned iff the second
+    ;; argument needs no tag.  If the message is 'count, the number
+    ;; of items needing tags is returned.
+    (let ([ht (make-eq-hashtable)] [count 0])
       (let find-dupls ([x x] [lev lev] [lslen len])
         (when (and (hashable? x) (not (limit? lev)))
           (let ([a (eq-hashtable-cell ht x 'first)])
@@ -148,153 +177,153 @@
               [(first)
                (set-cdr! a #f)
                (cond
-                 [(pair? x)
-                  (unless (limit? lslen)
-                    (find-dupls (car x) (decr lev) len)
-                    (find-dupls (cdr x) lev (decr lslen)))]
-                 [(vector? x)
-                  (unless (fx= (vector-length x) 0)
-                    (let ([m (if (print-vector-length)
-                                 ($last-new-vector-element vector-length vector-ref x)
-                                 (fx- (vector-length x) 1))]
-                          [lev (decr lev)])
-                      (let f ([i 0] [veclen len])
-                        (unless (or (fx> i m) (limit? veclen))
-                          (find-dupls (vector-ref x i) lev len)
-                          (f (fx+ i 1) (decr veclen))))))]
-                 [($stencil-vector? x)
-                  (unless (fx= ($stencil-vector-length x) 0)
-                    (let ([m (fx- ($stencil-vector-length x) 1)]
-                          [lev (decr lev)])
-                      (let f ([i 0] [veclen len])
-                        (unless (or (fx> i m) (limit? veclen))
-                          (find-dupls ($stencil-vector-ref x i) lev len)
-                          (f (fx+ i 1) (decr veclen))))))]
-                 [(and ($record? x) (not (eq? x #!base-rtd)))
-                  (when (print-record)
-                    ((record-writer ($record-type-descriptor x)) x (bit-sink)
-                     (lambda (x p)
-                       (unless (and (output-port? p) (textual-port? p))
-                         ($oops 'write "~s is not a textual output port" p))
-                       (find-dupls x (decr lev) len))))]
-                 [(box? x) (find-dupls (unbox x) (decr lev) len)]
-                 [(eq? x black-hole) (find-dupls x (decr lev) len)])]
+                [(pair? x)
+                 (unless (limit? lslen)
+                   (find-dupls (car x) (decr lev) len)
+                   (find-dupls (cdr x) lev (decr lslen)))]
+                [(vector? x)
+                 (unless (fx= (vector-length x) 0)
+                   (let ([m (if (print-vector-length)
+                                ($last-new-vector-element vector-length vector-ref x)
+                                (fx- (vector-length x) 1))]
+                         [lev (decr lev)])
+                     (let f ([i 0] [veclen len])
+                       (unless (or (fx> i m) (limit? veclen))
+                         (find-dupls (vector-ref x i) lev len)
+                         (f (fx+ i 1) (decr veclen))))))]
+                [($stencil-vector? x)
+                 (unless (fx= ($stencil-vector-length x) 0)
+                   (let ([m (fx- ($stencil-vector-length x) 1)]
+                         [lev (decr lev)])
+                     (let f ([i 0] [veclen len])
+                       (unless (or (fx> i m) (limit? veclen))
+                         (find-dupls ($stencil-vector-ref x i) lev len)
+                         (f (fx+ i 1) (decr veclen))))))]
+                [(and ($record? x) (not (eq? x #!base-rtd)))
+                 (when (print-record)
+                   ((record-writer ($record-type-descriptor x)) x (bit-sink)
+                    (lambda (x p)
+                      (unless (and (output-port? p) (textual-port? p))
+                        ($oops 'write "~s is not a textual output port" p))
+                      (find-dupls x (decr lev) len))))]
+                [(box? x) (find-dupls (unbox x) (decr lev) len)]
+                [(eq? x black-hole) (find-dupls x (decr lev) len)])]
               [(#f)
                (set! count (fx+ count 1))
                (set-cdr! a #t)]))))
       (and (not (fx= count 0))
            (let ([next -1])
-              (case-lambda
-                 [(msg x)
-                  (case msg
-                     [(tag)
-                      (and (hashable? x)
-                           (let ([a (eq-hashtable-cell ht x #f)])
-                              (case (cdr a)
-                                 [(#f) #f]
-                                 [(#t) (set! next (fx+ next 1))
-                                       (set-cdr! a `(ref . ,next))
-                                       `(mark . ,next)]
-                                 [else (cdr a)])))]
-                     [(tag?) (eq-hashtable-ref ht x #f)])]
-                 [(msg) (case msg [(count) count])])))))
+             (case-lambda
+               [(msg x)
+                (case msg
+                  [(tag)
+                   (and (hashable? x)
+                        (let ([a (eq-hashtable-cell ht x #f)])
+                          (case (cdr a)
+                            [(#f) #f]
+                            [(#t) (set! next (fx+ next 1))
+                             (set-cdr! a `(ref . ,next))
+                             `(mark . ,next)]
+                            [else (cdr a)])))]
+                  [(tag?) (eq-hashtable-ref ht x #f)])]
+               [(msg) (case msg [(count) count])])))))
 
-(define (really-cyclic? x lev len)
+  (define (really-cyclic? x lev len)
 
-  (define cyclic?
-    (lambda (x curlev lstlen)
-      (if (fixmediate? x)
-          (if (eq? x black-hole) (not lev) #f)
+    (define cyclic?
+      (lambda (x curlev lstlen)
+        (if (fixmediate? x)
+            (if (eq? x black-hole) (not lev) #f)
+            (and ($object-in-heap? x)
+                 (cond
+                  [(pair? x) (cyclic-structure? x curlev lstlen cyclic-pair?)]
+                  [(vector? x) (cyclic-structure? x curlev 0 cyclic-vector?)]
+                  [($stencil-vector? x) (cyclic-structure? x curlev 0 cyclic-stencil-vector?)]
+                  [(and ($record? x) (not (eq? x #!base-rtd)))
+                   (and (print-record)
+                        (cyclic-structure? x curlev lstlen
+                                           (lambda (x curlev lstlen)
+                                             (call/cc
+                                              (lambda (k)
+                                                ((record-writer ($record-type-descriptor x)) x (bit-sink)
+                                                 (lambda (x p)
+                                                   (unless (and (output-port? p) (textual-port? p))
+                                                     ($oops 'write "~s is not a textual output port" p))
+                                                   (if (cyclic? x (fx+ curlev 1) 0)
+                                                       (k #t))))
+                                                #f)))))]
+                  [(box? x) (cyclic-structure? x curlev 0 cyclic-box?)]
+                  [else #f])))))
+
+    (define cyclic-structure?
+      (let ([ht (make-eq-hashtable)])
+        (lambda (x curlev lstlen sub-cyclic?)
+          (and (not (eq? curlev lev))
+               (let ([a (eq-hashtable-cell ht x #f)])
+                 (let ([oldlev (cdr a)])
+                   (if oldlev
+                       (or (not (if (= oldlev curlev) len lev))
+                           (sub-cyclic? x curlev lstlen))
+                       (begin (set-cdr! a curlev)
+                              (or (sub-cyclic? x curlev lstlen)
+                                  (begin (set-cdr! a #f) #f))))))))))
+
+    (define cyclic-pair?
+      (lambda (x curlev lstlen)
+        (and (not (eq? lstlen len))
+             (or (cyclic? (car x) (fx+ curlev 1) 0)
+                 (cyclic? (cdr x) curlev (fx+ lstlen 1))))))
+
+    (define cyclic-vector?
+      (lambda (x curlev lstlen)
+        (let ([n (vector-length x)] [curlev (fx+ curlev 1)])
+          (let across ([i (fx- (if len (fxmin len n) n) 1)])
+            (and (fx>= i 0)
+                 (or (cyclic? (vector-ref x i) curlev 0)
+                     (across (fx- i 1))))))))
+
+    (define cyclic-stencil-vector?
+      (lambda (x curlev lstlen)
+        (let ([n ($stencil-vector-length x)] [curlev (fx+ curlev 1)])
+          (let across ([i (fx- (if len (fxmin len n) n) 1)])
+            (and (fx>= i 0)
+                 (or (cyclic? ($stencil-vector-ref x i) curlev 0)
+                     (across (fx- i 1))))))))
+
+    (define cyclic-box?
+      (lambda (x curlev lstlen)
+        (cyclic? (unbox x) (fx+ curlev 1) 0)))
+
+    (cyclic? x 0 0)
+
+    )
+
+  (define maybe-cyclic?
+    ;; brain damaged---can go essentially forever on very large trees
+    ;; should keep separate count, lev, and len variables
+    (lambda (x lev len)
+      (let down ([x x]
+                 [xlev (if lev
+                           (fxmin lev (constant cycle-node-max))
+                           (constant cycle-node-max))])
+        (cond
+         [(fx= xlev 0) (or (not lev) (fx> lev (constant cycle-node-max)))]
+         [(fixmediate? x) (if (eq? x black-hole) (not lev) #f)]
+         [else
           (and ($object-in-heap? x)
                (cond
-                 [(pair? x) (cyclic-structure? x curlev lstlen cyclic-pair?)]
-                 [(vector? x) (cyclic-structure? x curlev 0 cyclic-vector?)]
-                 [($stencil-vector? x) (cyclic-structure? x curlev 0 cyclic-stencil-vector?)]
-                 [(and ($record? x) (not (eq? x #!base-rtd)))
-                  (and (print-record)
-                       (cyclic-structure? x curlev lstlen
-                         (lambda (x curlev lstlen)
-                           (call/cc
-                             (lambda (k)
-                               ((record-writer ($record-type-descriptor x)) x (bit-sink)
-                                (lambda (x p)
-                                  (unless (and (output-port? p) (textual-port? p))
-                                    ($oops 'write "~s is not a textual output port" p))
-                                  (if (cyclic? x (fx+ curlev 1) 0)
-                                      (k #t))))
-                               #f)))))]
-                 [(box? x) (cyclic-structure? x curlev 0 cyclic-box?)]
-                 [else #f])))))
-
-   (define cyclic-structure?
-      (let ([ht (make-eq-hashtable)])
-         (lambda (x curlev lstlen sub-cyclic?)
-            (and (not (eq? curlev lev))
-                 (let ([a (eq-hashtable-cell ht x #f)])
-                    (let ([oldlev (cdr a)])
-                       (if oldlev
-                           (or (not (if (= oldlev curlev) len lev))
-                               (sub-cyclic? x curlev lstlen))
-                           (begin (set-cdr! a curlev)
-                                  (or (sub-cyclic? x curlev lstlen)
-                                      (begin (set-cdr! a #f) #f))))))))))
-
-   (define cyclic-pair?
-      (lambda (x curlev lstlen)
-         (and (not (eq? lstlen len))
-              (or (cyclic? (car x) (fx+ curlev 1) 0)
-                  (cyclic? (cdr x) curlev (fx+ lstlen 1))))))
-
-   (define cyclic-vector?
-      (lambda (x curlev lstlen)
-         (let ([n (vector-length x)] [curlev (fx+ curlev 1)])
-            (let across ([i (fx- (if len (fxmin len n) n) 1)])
-               (and (fx>= i 0)
-                    (or (cyclic? (vector-ref x i) curlev 0)
-                        (across (fx- i 1))))))))
-
-   (define cyclic-stencil-vector?
-      (lambda (x curlev lstlen)
-         (let ([n ($stencil-vector-length x)] [curlev (fx+ curlev 1)])
-            (let across ([i (fx- (if len (fxmin len n) n) 1)])
-               (and (fx>= i 0)
-                    (or (cyclic? ($stencil-vector-ref x i) curlev 0)
-                        (across (fx- i 1))))))))
-
-   (define cyclic-box?
-      (lambda (x curlev lstlen)
-         (cyclic? (unbox x) (fx+ curlev 1) 0)))
-
-  (cyclic? x 0 0)
-
-)
-
-(define maybe-cyclic?
-  ;; brain damaged---can go essentially forever on very large trees
-  ;; should keep separate count, lev, and len variables
-  (lambda (x lev len)
-    (let down ([x x]
-               [xlev (if lev
-                         (fxmin lev (constant cycle-node-max))
-                         (constant cycle-node-max))])
-      (cond
-        [(fx= xlev 0) (or (not lev) (fx> lev (constant cycle-node-max)))]
-        [(fixmediate? x) (if (eq? x black-hole) (not lev) #f)]
-        [else
-         (and ($object-in-heap? x)
-              (cond
                 [(pair? x)
                  (let across ([x x]
                               [xlen (if len
                                         (fxmin len (constant cycle-node-max))
                                         (constant cycle-node-max))])
                    (cond
-                     [(fx= xlen 0)
-                      (or (not len) (fx> len (constant cycle-node-max)))]
-                     [(pair? x)
-                      (or (down (car x) (fx- xlev 1))
-                          (across (cdr x) (fx- xlen 1)))]
-                     [else (down x (fx- xlev 1))]))]
+                    [(fx= xlen 0)
+                     (or (not len) (fx> len (constant cycle-node-max)))]
+                    [(pair? x)
+                     (or (down (car x) (fx- xlev 1))
+                         (across (cdr x) (fx- xlen 1)))]
+                    [else (down x (fx- xlev 1))]))]
                 [(vector? x)
                  (let ([n (vector-length x)])
                    (let across ([i (fx- (if len (fxmin len n) n) 1)])
@@ -310,32 +339,32 @@
                 [(and ($record? x) (not (eq? x #!base-rtd)))
                  (and (print-record)
                       (call/cc
-                        (lambda (k)
-                          ((record-writer ($record-type-descriptor x)) x (bit-sink)
-                           (lambda (x p)
-                             (unless (and (output-port? p) (textual-port? p))
-                               ($oops 'write "~s is not a textual output port" p))
-                             (if (down x (fx- xlev 1)) (k #t))))
-                          #f)))]
+                       (lambda (k)
+                         ((record-writer ($record-type-descriptor x)) x (bit-sink)
+                          (lambda (x p)
+                            (unless (and (output-port? p) (textual-port? p))
+                              ($oops 'write "~s is not a textual output port" p))
+                            (if (down x (fx- xlev 1)) (k #t))))
+                         #f)))]
                 [(box? x) (down (unbox x) (fx- xlev 1))]
                 [else #f]))]))))
 
-(set! $make-graph-env
-  (lambda (who x lev len)
-    (and (if (fixmediate? x)
-             (eq? x black-hole)
-             (and ($object-in-heap? x)
-                  (or (pair? x) (vector? x) ($stencil-vector? x) (box? x) (and ($record? x) (not (eq? x #!base-rtd))))))
-         (or (print-graph)
-             (and (not (and lev len))
-                  (maybe-cyclic? x lev len)
-                  (really-cyclic? x lev len)
-                  (begin
-                    (warningf who
-                      "cycle detected; proceeding with (print-graph #t)")
-                    #t)))
-         (graph-env x lev len))))
-)
+  (set! $make-graph-env
+        (lambda (who x lev len)
+          (and (if (fixmediate? x)
+                   (eq? x black-hole)
+                   (and ($object-in-heap? x)
+                        (or (pair? x) (vector? x) ($stencil-vector? x) (box? x) (and ($record? x) (not (eq? x #!base-rtd))))))
+               (or (print-graph)
+                   (and (not (and lev len))
+                        (maybe-cyclic? x lev len)
+                        (really-cyclic? x lev len)
+                        (begin
+                          (warningf who
+                                    "cycle detected; proceeding with (print-graph #t)")
+                          #t)))
+               (graph-env x lev len))))
+  )
 
 ;;; $last-new-vector-element is shared with read.ss and pretty.ss
 
@@ -738,9 +767,17 @@ floating point returns with (-1 0 -1 ...).
           [($exactnum?) (wrexactnum x r d? p)]
           [(box?) (wrbox x r lev len d? env p)]
           [(procedure?)
-           (if ($continuation? x)
-               (wrcontinuation x p)
-               (wrprocedure x p))]
+           (cond
+             [(and (wrapper-procedure? x)
+                   (print-record)
+                   (not (limit? lev)))
+              ((record-writer x) x p
+               (lambda (x p)
+                 (unless (and (output-port? p) (textual-port? p))
+                   ($oops 'write "~s is not a textual output port" p))
+                 (wr x r (decr lev) len d? env p)))]
+             [($continuation? x) (wrcontinuation x p)]
+             [else (wrprocedure x p)])]
           [(port?) (wrport x p)]
           [($code?) (wrcode x p)]
           [($tlc?) (display-string "#<tlc>" p)]
