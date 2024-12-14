@@ -1,12 +1,12 @@
 ;;; exceptions.ss
 ;;; Copyright 1984-2017 Cisco Systems, Inc.
-;;; 
+;;;
 ;;; Licensed under the Apache License, Version 2.0 (the "License");
 ;;; you may not use this file except in compliance with the License.
 ;;; You may obtain a copy of the License at
-;;; 
+;;;
 ;;; http://www.apache.org/licenses/LICENSE-2.0
-;;; 
+;;;
 ;;; Unless required by applicable law or agreed to in writing, software
 ;;; distributed under the License is distributed on an "AS IS" BASIS,
 ;;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -94,7 +94,7 @@ TODO:
           [(message-condition? c)
            (let ([irritants (if (irritants-condition? c) (condition-irritants c) '())])
              (case (and (list? irritants) (length irritants))
-               [(0) 
+               [(0)
                 ($report-string op
                   (and prefix? (if (warning-only? c) "warning" "exception"))
                   (and (who-condition? c) (condition-who c))
@@ -211,10 +211,30 @@ TODO:
     (lambda (x)
       ((base-exception-handler) x)))
 
-  ;; the initial value of `($current-handler-stack)` in a thread
-  ;; is #f; treat that the same as `default-handler-stack`:
   (define default-handler-stack
     (create-exception-stack default-handler))
+
+  (define current-handler-stack
+    (let ([default-cell (list default-handler-stack)])
+      (case-lambda
+        [()
+         (car
+           (or (continuation-marks-first (current-continuation-marks)
+                 current-handler-stack)
+               default-cell))]
+        [(stack)
+         (set-car!
+           (or (continuation-marks-first (current-continuation-marks)
+                 current-handler-stack)
+               default-cell)
+           stack)])))
+
+  (define-syntax with-handler-stack
+    (syntax-rules ()
+      [(_ handler-stack body1 body2 ...)
+       (with-continuation-mark current-handler-stack (list handler-stack)
+         (let ()
+           body1 body2 ...))]))
 
   (let ()
     (define-record-type exception-state
@@ -232,68 +252,58 @@ TODO:
 
     (set-who! current-exception-state
       (case-lambda
-        [() (make-exception-state ($current-handler-stack))]
+        [() (make-exception-state (current-handler-stack))]
         [(x)
          (unless (exception-state? x)
            ($oops who "~s is not an exception state" x))
-         ($current-handler-stack (exception-state-stack x))])))
+         (current-handler-stack (exception-state-stack x))])))
 
   (set-who! with-exception-handler
     (lambda (handler thunk)
       (unless (procedure? handler) ($oops who "~s is not a procedure" handler))
       (unless (procedure? thunk) ($oops who "~s is not a procedure" thunk))
-      (parameterize ([$current-handler-stack (cons handler ($current-handler-stack))])
+      (with-handler-stack (cons handler (current-handler-stack))
         (thunk))))
 
   (set-who! raise
     (lambda (obj)
-      (let ([stack (or ($current-handler-stack) default-handler-stack)])
+      (let ([stack (current-handler-stack)])
         (let ([handler (car stack)])
-          (parameterize ([$current-handler-stack (cdr stack)])
+          (with-handler-stack (cdr stack)
             (handler obj)
             (raise (make-non-continuable-violation)))))))
 
   (set-who! raise-continuable
     (lambda (obj)
-      (let ([stack (or ($current-handler-stack) default-handler-stack)])
+      (let ([stack (or (current-handler-stack) default-handler-stack)])
         (let ([handler (car stack)])
-          (parameterize ([$current-handler-stack (cdr stack)])
+          (with-handler-stack (cdr stack)
             (handler obj))))))
 
   (set-who! $guard
     (lambda (supply-else? guards body)
       (if supply-else?
-          ((call/cc
-             (lambda (kouter)
-               (let ([original-handler-stack ($current-handler-stack)])
-                 (with-exception-handler
-                   (lambda (arg)
-                     ((call/cc
+          (call/cc
+            (lambda (kouter)
+              (let ([original-handler-stack (current-handler-stack)])
+                (with-exception-handler
+                    (lambda (arg)
+                      (call/cc
                         (lambda (kinner)
-                          (kouter
+                          (call-in-continuation kouter
                             (lambda ()
                               (guards arg
                                 (lambda ()
-                                  (kinner
+                                  (call-in-continuation kinner
                                     (lambda ()
-                                      (parameterize ([$current-handler-stack original-handler-stack])
-                                        (raise-continuable arg))))))))))))
-                   (lambda ()
-                     (call-with-values
-                       body
-                       (case-lambda
-                         [(x) (lambda () x)]
-                         [vals (lambda () (apply values vals))]))))))))
-          ((call/cc
-             (lambda (k)
-               (with-exception-handler
-                 (lambda (arg) (k (lambda () (guards arg))))
-                 (lambda ()
-                   (call-with-values
-                     body
-                     (case-lambda
-                       [(x) (lambda () x)]
-                       [vals (lambda () (apply values vals))]))))))))))
+                                      (with-handler-stack original-handler-stack
+                                        (raise-continuable arg)))))))))))
+                  body))))
+          (call/cc
+            (lambda (k)
+              (with-exception-handler
+                  (lambda (arg) (call-in-continuation k (lambda () (guards arg))))
+                body))))))
 )
 
 (define-syntax guard
@@ -471,7 +481,7 @@ TODO:
 ;;; defining its child types, even though the system is compiled with
 ;;; (eval-syntax-expanders-when) not including compile.
 (begin
-(let-syntax ([a (syntax-rules () 
+(let-syntax ([a (syntax-rules ()
                   [(_ &condition) ; leave only &condition visible
                    (define-record-type (&condition make-simple-condition simple-condition?)
                      (nongenerative #{&condition oyb459ue1fphfx4-a}))])])
@@ -706,7 +716,7 @@ TODO:
       (for-each
         (lambda (m) (unless (string? m) ($oops who "~s is not a string" m)))
         messages)
-      (error-help #f who #f 
+      (error-help #f who #f
         (if (null? messages) "invalid syntax" (apply string-append messages))
         #f (make-syntax-violation form #f))))
 
