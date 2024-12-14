@@ -3912,7 +3912,9 @@
                           (attachments-in-continuation k))))))))))))
 
   (equal? '(inside outside)
-          (#%$call-setting-continuation-attachment
+    (begin
+      (pretty-print "XXXXXXX" (current-error-port))
+      (pretty-print (#%$call-setting-continuation-attachment
            'outside
            (lambda ()
              (#%$value
@@ -3925,7 +3927,22 @@
                      'inside
                      (lambda ()
                        (+ 1
-                          (same-attachments-in-continuation k))))))))))))
+                         (same-attachments-in-continuation k)))))))))))
+        (current-error-port))
+      (#%$call-setting-continuation-attachment
+        'outside
+        (lambda ()
+          (#%$value
+            (#%$call-setting-continuation-attachment
+              'tail
+              (lambda ()
+                (call/cc
+                  (lambda (k)
+                    (#%$call-setting-continuation-attachment
+                      'inside
+                      (lambda ()
+                        (+ 1
+                          (same-attachments-in-continuation k)))))))))))))
 
   (equal? '(inside2 outside)
           (#%$call-setting-continuation-attachment
