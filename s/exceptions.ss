@@ -211,23 +211,25 @@ TODO:
     (lambda (x)
       ((base-exception-handler) x)))
 
+  ;; the initial value of `($current-handler-stack)` in a thread
+  ;; is #f; treat that the same as `default-handler-stack`:
   (define default-handler-stack
     (create-exception-stack default-handler))
 
   (define current-handler-stack
-    (let ([default-cell (list default-handler-stack)])
-      (case-lambda
-        [()
-         (car
-           (or (continuation-marks-first (current-continuation-marks)
-                 current-handler-stack)
-               default-cell))]
-        [(stack)
-         (set-car!
-           (or (continuation-marks-first (current-continuation-marks)
-                 current-handler-stack)
-               default-cell)
-           stack)])))
+    (case-lambda
+      [()
+       (cond
+         [(continuation-marks-first (current-continuation-marks)
+            current-handler-stack) => car]
+         [else
+           ($current-handler-stack)])]
+      [(stack)
+       (cond
+         [(continuation-marks-first (current-continuation-marks)
+            current-handler-stack)
+          => (lambda (e) (set-car! e stack))]
+         [else ($current-handler-stack stack)])]))
 
   (define-syntax with-handler-stack
     (syntax-rules ()
@@ -267,7 +269,7 @@ TODO:
 
   (set-who! raise
     (lambda (obj)
-      (let ([stack (current-handler-stack)])
+      (let ([stack (or (current-handler-stack) default-handler-stack)])
         (let ([handler (car stack)])
           (with-handler-stack (cdr stack)
             (handler obj)
