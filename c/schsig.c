@@ -1,12 +1,12 @@
 /* schsig.c
  * Copyright 1984-2017 Cisco Systems, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -70,7 +70,8 @@ static void split(ptr k, ptr *s) {
                                  CONTLINK(k),
                                  *s,
                                  Snil,
-                                 Sfalse);
+                                 Sfalse,
+                                 Snil);
     CONTLENGTH(k) = CONTCLENGTH(k) = n;
     CONTSTACK(k) = TO_PTR(s);
     *s = TO_PTR(DOUNDERFLOW);
@@ -280,7 +281,8 @@ void S_overflow(ptr tc, iptr frame_request) {
                                         STACKLINK(tc),
                                         *split_point,
                                         Snil,
-                                        Sfalse);
+                                        Sfalse,
+                                        Snil);
 
           /* overwrite old return address with dounderflow */
               *split_point = TO_PTR(DOUNDERFLOW);
@@ -357,7 +359,7 @@ void S_error3(const char *who, const char *s, ptr x, ptr y, ptr z) {
 }
 
 void S_boot_error(ptr who, ptr msg, ptr args) {
-  printf("error caught before error-handing subsystem initialized\n"); 
+  printf("error caught before error-handing subsystem initialized\n");
   printf("who: ");
   S_prin1(who);
   printf("\nmsg: ");
@@ -489,7 +491,7 @@ void S_handle_event_detour() {
       for (i = argcnt; i > 0; i--)
         resume_args = Scons(S_get_scheme_arg(tc, i), resume_args);
       resume_args = Scons(resume_proc, resume_args);
- 
+
       CP(tc) = S_symbol_value(S_G.event_and_resume_star_id);
       S_put_scheme_arg(tc, 1, resume_args);
       AC0(tc) = (ptr)1;
@@ -856,6 +858,7 @@ void S_schsig_init(void) {
                            scaled_shot_1_shot_flag, scaled_shot_1_shot_flag,
                            FIX(0),
                            FIX(0),
+                           Snil,
                            Snil,
                            Snil));
 

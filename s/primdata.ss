@@ -1956,6 +1956,7 @@
   ($continuation-winders [flags single-valued])
   ($continuation-attachments [flags single-valued])
   ($continuation-marks-first [flags single-valued])
+  ($continuation-liquids [flags single-valued])
   ($cp0 [flags single-valued])
   ($cpcheck [flags single-valued])
   ($cpcheck-prelex-flags [flags single-valued])

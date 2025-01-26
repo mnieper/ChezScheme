@@ -1,12 +1,12 @@
 ;;; inspect.ss
 ;;; Copyright 1984-2017 Cisco Systems, Inc.
-;;; 
+;;;
 ;;; Licensed under the Apache License, Version 2.0 (the "License");
 ;;; you may not use this file except in compliance with the License.
 ;;; You may obtain a copy of the License at
-;;; 
+;;;
 ;;; http://www.apache.org/licenses/LICENSE-2.0
-;;; 
+;;;
 ;;; Unless required by applicable law or agreed to in writing, software
 ;;; distributed under the License is distributed on an "AS IS" BASIS,
 ;;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -757,7 +757,7 @@
   ["size"
    "recursively compute storage occupied by object"
    (() (fprintf (console-output-port) "~s\n" ((object) 'size (collect-maximum-generation))))
-   ((g) 
+   ((g)
     (require (or (and (fixnum? g) (fx<= 0 g (collect-maximum-generation))) (eq? g 'static)))
     (fprintf (console-output-port) "~s\n" ((object) 'size g)))]
 
@@ -2687,7 +2687,8 @@
                                                (compute-size ($closure-code x))
                                                (compute-size ($continuation-link x))
                                                (compute-size ($continuation-winders x))
-                                               (compute-size ($continuation-attachments x)))])
+                                               (compute-size ($continuation-attachments x))
+                                               (compute-size ($continuation-liquids x)))])
                               (if (fx>= i len)
                                   size
                                   (loop (fx+ i 1) (ash lpm -1) (if (odd? lpm) (fx+ size (compute-size ($continuation-stack-ref x i))) size)))))))
@@ -2865,6 +2866,7 @@
                      (compute-composition! ($continuation-link x))
                      (compute-composition! ($continuation-winders x))
                      (compute-composition! ($continuation-attachments x))
+                     (compute-composition! ($continuation-liquids x))
                      (let ([len ($continuation-stack-length x)])
                        (incr! stack (align (fx* len (constant ptr-bytes))))
                        (let loop ([i 1] [lpm ($continuation-return-livemask x)])
@@ -2930,7 +2932,7 @@
             (vector-map cons keys vals))))))
 
   (set-who! $make-object-finder
-    ; pred object maxgen => object-finder procedure that returns 
+    ; pred object maxgen => object-finder procedure that returns
     ;                               next object satisfying pred
     ;                               or #f, if no object found
     (lambda (pred x maxgen)
@@ -2943,7 +2945,7 @@
             (let ([path (cons x path)])
               (cond
                 [(or (fixmediate? x) (let ([g ($generation x)]) (or (not g) (fx> g maxgen))))
-                 (if (pred x) 
+                 (if (pred x)
                      (begin (set! saved-next-proc next-proc) path)
                      (next-proc))]
                 [else
@@ -2960,7 +2962,7 @@
                 [(_ ?next-proc) ?next-proc]
                 [(_ ?e ?e* ... ?next-proc)
                  (lambda () (find! ?e path (construct-proc ?e* ... ?next-proc)))]))
-            (let ([next-proc 
+            (let ([next-proc
                     (cond
                       [(pair? x) (construct-proc (car x) (cdr x) next-proc)]
                       [(symbol? x)
@@ -3020,9 +3022,10 @@
                                    (let loop ([i 1] [lpm ($continuation-return-livemask x)])
                                      (if (fx>= i len)
                                          (construct-proc ($continuation-return-code x) ($closure-code x) ($continuation-link x)
-                                                         ($continuation-winders x) ($continuation-attachments x) next-proc)
+                                           ($continuation-winders x) ($continuation-attachments x) ($continuation-liquids x)
+                                           next-proc)
                                          (if (odd? lpm)
-                                             (construct-proc ($continuation-stack-ref x i) (loop (fx+ i 1) (ash lpm -1))) 
+                                             (construct-proc ($continuation-stack-ref x i) (loop (fx+ i 1) (ash lpm -1)))
                                              (loop (fx+ i 1) (ash lpm -1))))))))
                            (construct-proc ($closure-code x)
                              (let ([n ($closure-length x)])

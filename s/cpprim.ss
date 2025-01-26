@@ -2912,6 +2912,7 @@
       (inline-accessor $continuation-link continuation-link-disp)
       (inline-accessor $continuation-winders continuation-winders-disp)
       (inline-accessor $continuation-attachments continuation-attachments-disp)
+      (inline-accessor $continuation-liquids continuation-liquids-disp)
       (inline-accessor csv7:record-type-descriptor record-type-disp)
       (inline-accessor $record-type-descriptor record-type-disp)
       (inline-accessor record-rtd record-type-disp)

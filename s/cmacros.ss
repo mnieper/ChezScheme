@@ -1569,7 +1569,8 @@
    [ptr link]
    [ptr return-address]
    [ptr winders]
-   [ptr attachments])) ; #f => not recorded
+   [ptr attachments] ; #f => not recorded
+   [ptr liquids]))
 
 (define-primitive-structure-disps record type-typed-object
   ([ptr type]

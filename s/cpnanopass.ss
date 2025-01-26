@@ -659,7 +659,7 @@
               (let ([seqno next-lambda-seqno])
                 (set! next-lambda-seqno (fx+ seqno 1))
                 seqno))))
-    
+
     (include "np-info.ss")
 
     (module ()
@@ -5113,6 +5113,7 @@
                                (set! ,(%mref ,%xp ,(constant continuation-return-address-disp)) ,ref-ret)
                                (set! ,(%mref ,%xp ,(constant continuation-winders-disp)) ,(%tc-ref winders))
                                (set! ,(%mref ,%xp ,(constant continuation-attachments-disp)) ,(%tc-ref attachments))
+                               (set! ,(%mref ,%xp ,(constant continuation-liquids-disp)) ,(%tc-ref liquids))
                                (set! ,ref-ret ,%ac0)
                                (set! ,(%mref ,%xp ,(constant continuation-link-disp)) ,%td)
                                (set! ,(%tc-ref stack-link) ,%xp)
@@ -5203,7 +5204,7 @@
                                ,(if (not reify?)
                                     `(set! ,lvalue ,t)
                                     (%seq
-                                     (set! ,lvalue ,t) 
+                                     (set! ,lvalue ,t)
                                      (set! ,%td (inline ,(intrinsic-info-asmlib reify-1cc #f) ,%asmlibcall))))
                                ;; Reified with attachment
                                ,(let ([get `(set! ,lvalue ,(%mref ,ats ,(constant pair-car-disp)))])
@@ -5299,6 +5300,7 @@
                          (set! ,(%mref ,%xp ,(constant continuation-return-address-disp)) ,%ref-ret)
                          (set! ,(%mref ,%xp ,(constant continuation-winders-disp)) ,(%tc-ref winders))
                          (set! ,(%mref ,%xp ,(constant continuation-attachments-disp)) ,(%tc-ref attachments))
+                         (set! ,(%mref ,%xp ,(constant continuation-liquids-disp)) ,(%tc-ref liquids))
                          ,(meta-cond
                             [(real-register? '%ret) `(set! ,%ret ,%ac0)]
                             [else `(nop)])
@@ -8501,7 +8503,7 @@
               (fx- offset (fx- (constant size-rp-header)
                                (constant size-rp-compact-header)))
               offset)))
-      
+
       (define asm-data-label
         (lambda (code* l offset func code-size)
           (let ([rel (make-funcrel 'abs l offset)])

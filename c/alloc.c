@@ -1,12 +1,12 @@
 /* alloc.c
  * Copyright 1984-2017 Cisco Systems, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -197,7 +197,7 @@ ptr S_compute_bytes_allocated(ptr xg, ptr xs) {
 
   alloc_mutex_release();
   tc_mutex_release();
-  
+
   return Sunsigned(n);
 }
 
@@ -433,7 +433,7 @@ void S_mark_card_dirty(uptr card, IGEN to_g) {
    allocation mutex must be held */
 void S_scan_dirty(ptr *p, ptr *endp) {
   uptr this, last;
- 
+
   last = 0;
 
   while (p < endp) {
@@ -854,7 +854,7 @@ ptr S_closure(ptr cod, iptr n) {
 }
 
 ptr S_mkcontinuation(ISPC s, IGEN g, ptr nuate, ptr stack, iptr length, iptr clength, ptr link,
-                     ptr ret, ptr winders, ptr attachments) {
+                     ptr ret, ptr winders, ptr attachments, ptr liquids) {
     ptr p;
     ptr tc = get_thread_context();
 
@@ -867,6 +867,7 @@ ptr S_mkcontinuation(ISPC s, IGEN g, ptr nuate, ptr stack, iptr length, iptr cle
     CONTRET(p) = ret;
     CONTWINDERS(p) = winders;
     CONTATTACHMENTS(p) = attachments;
+    CONTLIQUIDS(p) = liquids;
     return p;
 }
 

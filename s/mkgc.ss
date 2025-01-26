@@ -232,40 +232,41 @@
          (copy continuation-stack-clength)
          (trace-pure-nonself continuation-winders)
          (trace-nonself continuation-attachments)
+         (trace-nonself continuation-liquids)
          (cond
            [(== (continuation-stack-length _) scaled-shot-1-shot-flag)]
            [else
-            (case-mode
-             [(sweep)
-              (define stk : ptr (continuation-stack _))
-              (define s_si : seginfo* NULL)
-              (when (&& (!= stk (cast ptr 0))
+             (case-mode
+               [(sweep)
+                (define stk : ptr (continuation-stack _))
+                (define s_si : seginfo* NULL)
+                (when (&& (!= stk (cast ptr 0))
                         (begin
                           (set! s_si (SegInfo (ptr_get_segment stk)))
                           (-> s_si old_space)))
-                (cond
-                  [(! (SEGMENT_IS_LOCAL s_si stk))
-                   ;; A stack segment has a single owner, so it's ok for us
-                   ;; to sweep the stack content, even though it's on a
-                   ;; remote segment relative to the current sweeper.
-                   (RECORD_REMOTE s_si)]
-                  [else
-                   (set! (continuation-stack _)
-                         (copy_stack _tgc_
-                                     (continuation-stack _)
-                                     (& (continuation-stack-length _))
-                                     (continuation-stack-clength _)))]))]
-             [else])
-            (count countof-stack (continuation-stack-length _) 1 [measure])
-            (trace-pure continuation-link)
-            (trace-return continuation-return-address (continuation-return-address _))
-            (case-mode
-             [copy (copy continuation-stack)]
-             [else
-              (define stack : uptr (cast uptr (continuation-stack _)))
-              (trace-stack stack
-                           (+ stack (continuation-stack-clength _))
-                           (cast uptr (continuation-return-address _)))])])])
+                  (cond
+                    [(! (SEGMENT_IS_LOCAL s_si stk))
+                     ;; A stack segment has a single owner, so it's ok for us
+                     ;; to sweep the stack content, even though it's on a
+                     ;; remote segment relative to the current sweeper.
+                     (RECORD_REMOTE s_si)]
+                    [else
+                      (set! (continuation-stack _)
+                        (copy_stack _tgc_
+                          (continuation-stack _)
+                          (& (continuation-stack-length _))
+                          (continuation-stack-clength _)))]))]
+               [else])
+             (count countof-stack (continuation-stack-length _) 1 [measure])
+             (trace-pure continuation-link)
+             (trace-return continuation-return-address (continuation-return-address _))
+             (case-mode
+               [copy (copy continuation-stack)]
+               [else
+                 (define stack : uptr (cast uptr (continuation-stack _)))
+                 (trace-stack stack
+                   (+ stack (continuation-stack-clength _))
+                   (cast uptr (continuation-return-address _)))])])])
        (count countof-continuation)]
 
       [else

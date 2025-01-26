@@ -756,6 +756,12 @@
          ($oops '$continuation-attachments "~s is not a continuation" x))
       ($continuation-attachments x)))
 
+(define $continuation-liquids
+   (lambda (x)
+      (unless ($continuation? x)
+         ($oops '$continuation-liquids "~s is not a continuation" x))
+      ($continuation-liquids x)))
+
 (define $continuation-return-code
    (lambda (x)
       (unless ($continuation? x)
