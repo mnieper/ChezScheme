@@ -71,7 +71,7 @@ static void split(ptr k, ptr *s) {
                                  *s,
                                  Snil,
                                  Sfalse,
-                                 Snil);
+                                 Sfalse);
     CONTLENGTH(k) = CONTCLENGTH(k) = n;
     CONTSTACK(k) = TO_PTR(s);
     *s = TO_PTR(DOUNDERFLOW);
@@ -282,7 +282,7 @@ void S_overflow(ptr tc, iptr frame_request) {
                                         *split_point,
                                         Snil,
                                         Sfalse,
-                                        Snil);
+                                        Sfalse);
 
           /* overwrite old return address with dounderflow */
               *split_point = TO_PTR(DOUNDERFLOW);

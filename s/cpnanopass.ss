@@ -4948,7 +4948,11 @@
                              ; (new) stack base in sfp, clength in ac1, old frame base in yp
                              ; set up return address and stack link
                              (set! ,(%tc-ref stack-link) ,(%mref ,xp/cp ,(constant continuation-link-disp)))
-                             ; potentially pop an attachment
+                             ; potentially pop liquids/an attachment
+                             (set! ,%ts ,(%mref ,xp/cp ,(constant continuation-liquids-disp)))
+                             (if ,(%inline eq? ,(%constant sfalse) ,%ts)
+                                 (nop)
+                                 (set! ,(%tc-ref liquids) ,%ts))
                              (set! ,%ts ,(%mref ,xp/cp ,(constant continuation-attachments-disp)))
                              (if ,(%inline eq? ,(%constant sfalse) ,%ts)
                                  (nop)
@@ -5011,11 +5015,15 @@
                        ,(%seq
                          (set! ,%ts ,(%inline + ,%td ,(%mref ,xp/cp ,(constant continuation-stack-disp))))
                          (if ,(%inline eq? ,%sfp ,%ts)
-                             ; merge, and we assume that the continuation includes attachments
+                             ; merge, and we assume that the continuation includes attachments and liquids
                              ,(%seq
                                (set! ,(%tc-ref scheme-stack-size) ,(%inline + ,%td ,(%tc-ref scheme-stack-size)))
                                (set! ,(%tc-ref scheme-stack) ,(%mref ,xp/cp ,(constant continuation-stack-disp)))
                                (set! ,(%tc-ref stack-link) ,(%mref ,xp/cp ,(constant continuation-link-disp)))
+                               (set! ,%ts ,(%mref ,xp/cp ,(constant continuation-liquids-disp))) ;XXX(mnieper): Do we need the test here?
+                               (if ,(%inline eq? ,(%constant sfalse) ,%ts)
+                                 (nop)
+                                 (set! ,(%tc-ref liquids) ,%ts))
                                (set! ,%ts ,(%mref ,xp/cp ,(constant continuation-attachments-disp)))
                                (set! ,(%mref ,xp/cp ,(constant continuation-stack-clength-disp)) (immediate 0)) ; in case GC sees it
                                (set! ,(%tc-ref cached-frame) ,xp/cp) ; save for fast immediate realloc
