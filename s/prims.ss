@@ -1,12 +1,12 @@
 ;;; prims.ss
 ;;; Copyright 1984-2017 Cisco Systems, Inc.
-;;; 
+;;;
 ;;; Licensed under the Apache License, Version 2.0 (the "License");
 ;;; you may not use this file except in compliance with the License.
 ;;; You may obtain a copy of the License at
-;;; 
+;;;
 ;;; http://www.apache.org/licenses/LICENSE-2.0
-;;; 
+;;;
 ;;; Unless required by applicable law or agreed to in writing, software
 ;;; distributed under the License is distributed on an "AS IS" BASIS,
 ;;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -1521,7 +1521,7 @@
     (#3%mutable-box? b)))
 
 (define immutable-box?
-  (lambda (b) 
+  (lambda (b)
     (#3%immutable-box? b)))
 
 (define pair? (lambda (x) (pair? x)))
@@ -1789,6 +1789,11 @@
      (unless (list? w)
        ($oops '$current-attachments "malformed attachments ~s" w))
      ($current-attachments w)]))
+
+(define $current-liquids
+  (case-lambda
+    [() ($current-liquids)]
+    [(w) ($current-liquids w)]))
 
 (define-who $current-handler-stack
   (case-lambda
@@ -2315,7 +2320,7 @@
     (foreign-procedure "(cs)phantom_bytevector_adjust"
       (scheme-object uptr)
       void))
-  
+
   (set-who! phantom-bytevector?
     (lambda (v) (phantom-bytevector? v)))
 
@@ -2333,12 +2338,12 @@
       (let ([ph ($make-phantom-bytevector)])
         ($phantom-bytevector-adjust! ph n)
         ph)))
-  
+
   (set-who! phantom-bytevector-length
     (lambda (ph)
       (unless (phantom-bytevector? ph) ($oops who "~s is not a phantom bytevector" ph))
       (#3%phantom-bytevector-length ph)))
-  
+
   (set-who! set-phantom-bytevector-length!
     (lambda (ph n)
       (define addr?

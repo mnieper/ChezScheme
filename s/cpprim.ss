@@ -2987,7 +2987,7 @@
                               ,(%constant sfalse)
                               ,(let ([s `(inline ,(make-info-load 'unsigned-8 #f) ,%load ,si ,%zero (immediate 0))])
                                  (%inline eq? (immediate ,space) ,s))))))))
-   
+
          (define-inline 2 $maybe-seginfo
            [(e)
             (bind #t (e)
@@ -3431,6 +3431,7 @@
       (define-tc-parameter $current-stack-link stack-link)
       (define-tc-parameter $current-winders winders)
       (define-tc-parameter $current-attachments attachments)
+      (define-tc-parameter $current-liquids liquids)
       (define-tc-parameter $current-handler-stack handler-stack)
       (define-tc-parameter default-record-equal-procedure default-record-equal-procedure)
       (define-tc-parameter default-record-hash-procedure default-record-hash-procedure)
@@ -4799,7 +4800,7 @@
         [(e) (ensure-single-valued e)]
         [(e1 e2) (build-fp-op-2 %fp+ e1 e2)]
         [(e1 . e*) (reduce-fp src sexpr 3 'fl+ e1 e*)])
-         
+
       (define-inline 3 fl*
         [() `(quote 1.0)]
         [(e) (ensure-single-valued e)]
@@ -4865,7 +4866,7 @@
 
       (define-inline 3 flexpt
         [(e1 e2) (build-fl-call (lookup-c-entry flexpt) e1 e2)])
-      
+
       (let ()
         (define build-fl-make-rectangular
           (lambda (e1 e2)
@@ -5236,7 +5237,7 @@
         (define-fl2-call flatan flatan2)
         (define-fl-call flexp)
         (define-fl2-call fllog fllog2))
-      
+
       (define-inline 2 flexpt
         [(e1 e2) (build-checked-fp-op e1 e2
                    (lambda (e1 e2) (build-fl-call (lookup-c-entry flexpt) e1 e2))
@@ -5594,7 +5595,7 @@
          (define-fptr-ref-inline $fptr-ref-unsigned-48 'unsigned-48 #f)
          (define-fptr-ref-inline $fptr-ref-swap-integer-48 'integer-48 #t)
          (define-fptr-ref-inline $fptr-ref-swap-unsigned-48 'unsigned-48 #t)
-         
+
          (define-fptr-ref-inline $fptr-ref-integer-56 'integer-56 #f)
          (define-fptr-ref-inline $fptr-ref-unsigned-56 'unsigned-56 #f)
          (define-fptr-ref-inline $fptr-ref-swap-integer-56 'integer-56 #t)
@@ -5711,7 +5712,7 @@
          (define-fptr-set!-inline #t $fptr-set-unsigned-48! 'unsigned-48 build-object-set!)
          (define-fptr-set!-inline #t $fptr-set-swap-integer-48! 'integer-48 build-swap-object-set!)
          (define-fptr-set!-inline #t $fptr-set-swap-unsigned-48! 'unsigned-48 build-swap-object-set!)
-         
+
          (define-fptr-set!-inline #t $fptr-set-integer-56! 'integer-56 build-object-set!)
          (define-fptr-set!-inline #t $fptr-set-unsigned-56! 'unsigned-56 build-object-set!)
          (define-fptr-set!-inline #t $fptr-set-swap-integer-56! 'integer-56 build-swap-object-set!)
@@ -7846,7 +7847,7 @@
         (%mref ,(%mref ,e-k ,(constant continuation-stack-disp))
                ,(translate e-i (constant fixnum-offset) (constant log2-ptr-bytes))
                0))
-      
+
       (define build-return-code
         (lambda (e-ra)
           (safe-assert (= (constant compact-return-address-toplink-disp)
@@ -7881,7 +7882,7 @@
                                            ,(%constant compact-frame-words-mask))
                              ,(%constant fixnum-offset))
                    ,(%mref ,ra ,(constant return-address-frame-size-disp)))))))
-      
+
       (define-inline 3 $continuation-return-code
         [(e) (build-return-code (build-ra e))])
       (define-inline 3 $continuation-return-offset

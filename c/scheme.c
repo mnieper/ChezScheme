@@ -103,6 +103,7 @@ static void main_init(void) {
     }
 
     PARAMETERS(tc) = S_G.null_vector;
+    LIQUIDS(tc) = Snil;
     for (i = 0 ; i < virtual_register_count ; i += 1) {
       VIRTREG(tc, i) = FIX(0);
     }
