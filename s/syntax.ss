@@ -8065,6 +8065,27 @@
       ((delay exp)
        (syntax ($make-promise (lambda () exp)))))))
 
+(define-syntax define-liquid
+  (lambda (x)
+    (syntax-case x ()
+      [(_ name dflt)
+       (identifier? #'name)
+       #'(begin
+           (define key (gensym))
+           (define tmp dflt)
+           (define-syntax name
+             (identifier-syntax
+               [_ (liquid-ref key tmp)]
+               [(set! _ e) (liquid-set! key e)])))]
+      [(_ name)
+       (identifier? #'name)
+       #'(begin
+           (define key (gensym))
+           (define-syntax name
+             (identifier-syntax
+               [_ (liquid-ref key (void))]
+               [(set! _ e) (liquid-set! key e)])))])))
+
 (define-syntax define-structure
   (lambda (x)
     (define construct-name

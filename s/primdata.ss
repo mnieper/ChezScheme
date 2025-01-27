@@ -1061,6 +1061,7 @@
   (critical-section [flags])
   (datum [flags])
   (define-ftype [flags])
+  (define-liquid [flags])
   (define-property [flags])
   (define-record [flags])
   (define-structure [flags])
