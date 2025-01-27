@@ -1487,6 +1487,8 @@
   (list-copy [sig [(list) -> (list)]] [flags alloc])
   (list-head [sig [(sub-ptr sub-index) -> (list)]] [flags alloc])
   (literal-identifier=? [sig [(identifier identifier) -> (boolean)]] [flags pure mifoldable discard cp03])
+  (liquid-ref [sig [(ptr) (ptr ptr) -> (ptr)]] [flags])
+  (liquid-set! [sig [(ptr ptr) -> (void)]] [flags true])
   (load [sig [(pathname) (pathname procedure) -> (void)]] [flags true ieee r5rs])
   (load-compiled-from-port [sig [(ptr) (ptr vector) -> (ptr ...)]] [flags])
   (load-library [sig [(pathname) (pathname procedure) -> (void)]] [flags true])

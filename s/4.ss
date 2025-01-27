@@ -1,12 +1,12 @@
 ;;; 4.ss
 ;;; Copyright 1984-2017 Cisco Systems, Inc.
-;;; 
+;;;
 ;;; Licensed under the Apache License, Version 2.0 (the "License");
 ;;; you may not use this file except in compliance with the License.
 ;;; You may obtain a copy of the License at
-;;; 
+;;;
 ;;; http://www.apache.org/licenses/LICENSE-2.0
-;;; 
+;;;
 ;;; Unless required by applicable law or agreed to in writing, software
 ;;; distributed under the License is distributed on an "AS IS" BASIS,
 ;;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -221,7 +221,7 @@
                      (let-values ([(cdrs cars) (getcxrs more who)])
                        (for-each (fx- n 1) ls cdrs cars))))))))]))
 
-  (set-who! fold-left 
+  (set-who! fold-left
     (case-lambda
       [(combine nil ls)
        (unless (procedure? combine) (nonprocedure-error who combine))
@@ -250,7 +250,7 @@
                      (let-values ([(cdrs cars) (getcxrs more who)])
                        (fold-left cdrls cdrs cars acc)))))))]))
 
-  (set-who! fold-right 
+  (set-who! fold-right
     (case-lambda
       [(combine nil ls)
        (unless (procedure? combine) (nonprocedure-error who combine))
@@ -270,7 +270,7 @@
          (if (null? ls)
              nil
              (apply combine (car ls)
-               (#3%fold-right cons 
+               (#3%fold-right cons
                  (list (fold-right combine nil (cdr ls) (map cdr more)))
                  (map car more)))))]))
 )
@@ -278,7 +278,7 @@
 
 (let ()
   (include "types.ss")
-  
+
   (define disable/enable (make-winder disable-interrupts enable-interrupts '()))
 
   (define (dwind in body out)
@@ -438,7 +438,7 @@
                                slow-markss)
                            (fx+ i 1))))])))
 
-        (define update-cache 
+        (define update-cache
           (lambda (cache key val)
             (cond
               [(null? cache) (list (ephemeron-cons key val))]
@@ -564,6 +564,28 @@
               ($call-in-continuation c markss proc))]))
 
         continuation-marks?))
+
+;;; liquids
+
+(set-who! liquid-ref
+  (rec liquid-ref
+    (case-lambda
+      [(key) (liquid-ref key #f)]
+      [(key dflt)
+       (let ([a (assq key ($current-liquids))])
+         (if a (cdr a) dflt))])))
+
+(set-who! liquid-set!
+  (lambda (key val)
+    ($current-liquids
+      (let f ([al ($current-liquids)])
+        (cond
+          [(null? al)
+           (list (cons key val))]
+          [(eq? key (caar al))
+           (cons (cons key val) (cdr al))]
+          [else
+            (cons (car al) (f (cdr al)))])))))
 
 ;;; make-promise and force
 
