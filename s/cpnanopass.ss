@@ -5153,7 +5153,13 @@
                                                 ,(%mref ,%td ,(constant continuation-attachments-disp))
                                                 ,(%constant sfalse))
                                             (false)
-                                            ,(%inline eq? ,ref-ret ,%ac0))
+                                            (if ,(%inline eq? ,ref-ret ,%ac0)
+                                                (begin
+                                                  (set! ,%xp ,(%tc-ref liquids))
+                                                  (if ,(%inline eq? ,%xp ,(%mref ,%td ,(constant continuation-liquids-disp)))
+                                                      (true)
+                                                      (false)))
+                                                (false)))
                                         ,(finish %td)
                                         ,(build-reify)))))])
                      (if 1-shot?
